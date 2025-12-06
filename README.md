@@ -1,144 +1,258 @@
-# GenAI Chat UI
+# GenAI Chat UI - MVP
 
-A sleek, modern chat interface for interacting with Large Language Models (LLMs). Built with Next.js, React, TypeScript, and Tailwind CSS.
+A powerful, multi-LLM chat interface that lets you seamlessly switch between different AI providers (OpenAI, Anthropic Claude, Google Gemini) with project organization and chat persistence. Built with Next.js, React, TypeScript, and Tailwind CSS.
 
-## Features
+## 🚀 MVP Features
 
-- 🎨 **Beautiful UI** - Clean, modern interface with smooth animations
-- ⚡ **Real-time Streaming** - See responses as they're generated
-- 📱 **Responsive Design** - Works seamlessly on desktop and mobile
-- 🔒 **Type Safe** - Built with TypeScript for better development experience
-- 🌙 **Dark Mode Ready** - Includes dark mode support (can be extended)
-- 🎯 **Customizable** - Easy to modify and extend
+### Multi-LLM Support
+- **3 LLM Providers**: OpenAI (GPT-4, GPT-4o-mini, GPT-3.5-turbo), Anthropic (Claude 3.5 Sonnet, Claude 3 Opus, etc.), Google (Gemini 1.5 Pro, Gemini 1.5 Flash)
+- **Easy Switching**: Switch between providers and models with a simple dropdown
+- **Visual Indicators**: See which providers have API keys configured
 
-## Tech Stack
+### API Key Management
+- **Secure Storage**: API keys are encrypted and stored locally in your browser
+- **Validation**: Test API keys before saving
+- **Per-Provider Keys**: Configure separate keys for each LLM provider
+- **Settings Page**: Dedicated UI for managing all API keys
+
+### Project System
+- **Organize Chats**: Create multiple projects to organize your conversations
+- **Project Sidebar**: Easy navigation between projects
+- **Project Management**: Create, rename, and delete projects
+
+### Chat Persistence
+- **Auto-Save**: Chats are automatically saved as you type
+- **Chat History**: View and load previous conversations
+- **Project-Based**: Chats are organized by project
+- **Chat Management**: Rename and delete chats
+
+### Model Parameters
+- **Temperature Control**: Adjust creativity/randomness (0-2)
+- **Max Tokens**: Set maximum response length
+- **Persistent Settings**: Parameters are saved with each chat
+
+### Modern UI/UX
+- **Beautiful Interface**: Clean, modern design with smooth animations
+- **Real-time Streaming**: See responses as they're generated
+- **Responsive Design**: Works seamlessly on desktop and mobile
+- **Dark Mode Ready**: Includes dark mode support
+
+## 🛠️ Tech Stack
 
 - **Next.js 14** - React framework with App Router
-- **TypeScript** - Type safety
+- **TypeScript** - Type safety throughout
 - **Tailwind CSS** - Utility-first CSS framework
 - **Radix UI** - Accessible component primitives
 - **Lucide React** - Beautiful icons
+- **crypto-js** - API key encryption
+- **date-fns** - Date formatting
 
-## Getting Started
+## 📦 Installation
 
 ### Prerequisites
 
 - Node.js 18+ and npm/yarn/pnpm
-- OpenAI API key (or configure another LLM provider)
+- API keys for at least one LLM provider:
+  - OpenAI: [Get API Key](https://platform.openai.com/api-keys)
+  - Anthropic: [Get API Key](https://console.anthropic.com/)
+  - Google: [Get API Key](https://makersuite.google.com/app/apikey)
 
-### Installation
+### Setup
 
 1. **Clone and install dependencies:**
 
 ```bash
 npm install
-# or
-yarn install
-# or
-pnpm install
 ```
 
-2. **Set up environment variables:**
-
-Copy the example environment file and add your API key:
-
-```bash
-cp .env.example .env.local
-```
-
-Then edit `.env.local` and add your OpenAI API key:
-
-```
-OPENAI_API_KEY=your_actual_api_key_here
-OPENAI_MODEL=gpt-4o-mini
-```
-
-3. **Run the development server:**
+2. **Run the development server:**
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
 ```
 
-4. **Open your browser:**
+3. **Open your browser:**
 
 Navigate to [http://localhost:3000](http://localhost:3000)
 
-## Configuration
+4. **Configure API Keys:**
 
-### OpenAI Models
+   - Click the "Settings" button in the header
+   - Enter your API keys for the providers you want to use
+   - Optionally validate each key
+   - Click "Save Settings"
 
-You can change the model by setting the `OPENAI_MODEL` environment variable:
+## 🎯 Quick Start Guide
 
-- `gpt-4o-mini` (default, fast and cost-effective)
-- `gpt-4o` (more capable)
-- `gpt-4-turbo`
-- `gpt-3.5-turbo`
+### 1. Configure API Keys
 
-### Customizing the UI
+1. Go to **Settings** (click the gear icon in the header)
+2. Enter your API keys for one or more providers
+3. Click **Validate** to test each key
+4. Click **Save Settings**
 
-The UI is built with modular components:
+### 2. Create a Project
 
-- `components/chat/chat-container.tsx` - Main chat container
-- `components/chat/chat-message.tsx` - Individual message bubbles
-- `components/chat/chat-input.tsx` - Message input field
-- `components/chat/chat-header.tsx` - Header with controls
+1. In the **Projects** sidebar, click **New Project**
+2. Enter a project name (e.g., "Research", "Code Help")
+3. Click **Create**
 
-You can easily customize colors, spacing, and behavior by editing these components or the Tailwind configuration.
+### 3. Start a Chat
 
-## Project Structure
+1. In the **Chats** sidebar, click **New Chat**
+2. Select your preferred LLM from the dropdown in the header
+3. Type your message and press Enter
+4. Your chat will auto-save as you use it
+
+### 4. Switch LLMs Mid-Conversation
+
+1. Click the **LLM selector** in the header (shows current provider/model)
+2. Select a different provider or model
+3. Continue your conversation - each message uses the selected LLM
+
+### 5. Adjust Model Parameters
+
+1. Click **Parameters** in the header to expand the panel
+2. Adjust **Temperature** (0-2) for creativity
+3. Set **Max Tokens** to limit response length
+4. Changes apply to new messages
+
+## 📁 Project Structure
 
 ```
 ├── app/
 │   ├── api/
-│   │   └── chat/
-│   │       └── route.ts       # API endpoint for chat
-│   ├── globals.css            # Global styles
-│   ├── layout.tsx             # Root layout
-│   └── page.tsx               # Main chat page
+│   │   ├── chat/
+│   │   │   └── route.ts           # Chat API endpoint (multi-LLM support)
+│   │   └── settings/
+│   │       └── route.ts           # Settings API (key validation)
+│   ├── settings/
+│   │   └── page.tsx               # Settings page
+│   ├── globals.css                # Global styles
+│   ├── layout.tsx                 # Root layout with providers
+│   └── page.tsx                   # Main chat page
 ├── components/
-│   ├── chat/                  # Chat-specific components
-│   └── ui/                    # Reusable UI components
+│   ├── chat/                      # Chat components
+│   ├── chats/                     # Chat list component
+│   ├── llm/                       # LLM selector component
+│   ├── projects/                  # Project sidebar components
+│   ├── settings/                  # Settings components
+│   └── ui/                        # Reusable UI components
 ├── lib/
-│   └── utils.ts               # Utility functions
-└── public/                    # Static assets
+│   ├── llm/
+│   │   ├── providers/             # LLM provider implementations
+│   │   │   ├── base.ts           # Base provider interface
+│   │   │   ├── openai.ts         # OpenAI implementation
+│   │   │   ├── anthropic.ts      # Anthropic implementation
+│   │   │   └── google.ts         # Google implementation
+│   │   └── provider-factory.ts   # Provider registry
+│   ├── contexts/
+│   │   ├── llm-context.tsx       # LLM state management
+│   │   └── project-context.tsx   # Project state management
+│   ├── storage/
+│   │   ├── settings.ts           # Settings storage (encrypted)
+│   │   ├── projects.ts           # Project storage
+│   │   └── chats.ts              # Chat storage
+│   └── utils/
+│       └── encryption.ts         # API key encryption
+└── package.json
 ```
 
-## Extending to Other LLM Providers
+## 🔧 Configuration
 
-To use a different LLM provider, modify `app/api/chat/route.ts`:
+### Environment Variables (Optional)
 
-1. Update the API endpoint URL
-2. Adjust the request format
-3. Handle the response stream format
+For development, you can set API keys in `.env.local`:
 
-Example for Anthropic Claude:
-
-```typescript
-const response = await fetch("https://api.anthropic.com/v1/messages", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "x-api-key": process.env.ANTHROPIC_API_KEY!,
-    "anthropic-version": "2023-06-01",
-  },
-  body: JSON.stringify({
-    model: "claude-3-opus-20240229",
-    max_tokens: 1024,
-    messages: messages,
-    stream: true,
-  }),
-})
+```bash
+OPENAI_API_KEY=your_key_here
+ANTHROPIC_API_KEY=your_key_here
+GOOGLE_API_KEY=your_key_here
 ```
 
-## License
+**Note**: The MVP primarily uses browser-based storage. Environment variables serve as fallbacks during development.
+
+### Available Models
+
+#### OpenAI
+- `gpt-4o` - Latest and most capable
+- `gpt-4o-mini` - Fast and cost-effective (default)
+- `gpt-4-turbo` - High performance
+- `gpt-4` - Standard GPT-4
+- `gpt-3.5-turbo` - Fast and affordable
+
+#### Anthropic Claude
+- `claude-3-5-sonnet-20241022` - Latest Claude 3.5
+- `claude-3-5-sonnet-20240620` - Claude 3.5 Sonnet
+- `claude-3-opus-20240229` - Most capable
+- `claude-3-sonnet-20240229` - Balanced performance
+- `claude-3-haiku-20240307` - Fast and efficient
+
+#### Google Gemini
+- `gemini-1.5-pro` - Most capable
+- `gemini-1.5-flash` - Fast and efficient
+- `gemini-pro` - Standard model
+
+## 🔒 Security Notes
+
+- **API Keys**: Stored encrypted in browser localStorage
+- **Local Storage**: All data is stored locally in your browser
+- **No Server Storage**: API keys never leave your device (except to the LLM provider APIs)
+- **Production**: For production use, consider implementing server-side key management
+
+## 📝 Usage Tips
+
+1. **Organize by Project**: Create separate projects for different topics or use cases
+2. **Switch LLMs**: Different providers excel at different tasks - experiment!
+3. **Adjust Temperature**: 
+   - Low (0.1-0.3): More deterministic, good for factual queries
+   - Medium (0.7): Balanced creativity (default)
+   - High (1.5-2.0): More creative, good for brainstorming
+4. **Chat Persistence**: Your chats auto-save, so you can safely close and reopen
+5. **Multiple Conversations**: Each project can have multiple chats
+
+## 🐛 Troubleshooting
+
+### API Key Errors
+
+- **"API key is required"**: Go to Settings and configure your API keys
+- **"API key validation failed"**: Check that your key is correct and has the right permissions
+- **Rate Limit Errors**: You've exceeded your API quota - wait or upgrade your plan
+
+### Storage Issues
+
+- **Chats not saving**: Check browser localStorage quota (usually 5-10MB)
+- **Data lost**: All data is stored locally - clearing browser data will delete it
+
+### Build Errors
+
+- Run `npm install` to ensure all dependencies are installed
+- Check Node.js version (requires 18+)
+- Clear `.next` folder and rebuild: `rm -rf .next && npm run build`
+
+## 🚧 Known Limitations (MVP)
+
+- **Local Storage Only**: Data stored in browser (not synced across devices)
+- **No Export/Import**: Can't export chats or settings yet
+- **No Search**: Can't search through chat history
+- **No Sharing**: Can't share chats with others
+- **Manual API Key Entry**: No OAuth integration
+
+## 🔮 Future Enhancements
+
+- Database integration (PostgreSQL/SQLite)
+- User authentication
+- Chat export/import
+- Global search
+- Dark/light mode toggle
+- Keyboard shortcuts
+- RAG/Knowledge base integration
+- Workflow builder
+
+## 📄 License
 
 MIT
 
-## Contributing
+## 🤝 Contributing
 
 Feel free to submit issues and enhancement requests!
-

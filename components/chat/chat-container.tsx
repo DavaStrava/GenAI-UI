@@ -25,7 +25,7 @@ export function ChatContainer({ messages, isLoading }: ChatContainerProps) {
             <div className="text-center space-y-4 max-w-md">
               <h2 className="text-2xl font-semibold">Welcome to GenAI Chat</h2>
               <p className="text-muted-foreground">
-                Start a conversation by typing a message below. I'm here to help
+                Start a conversation by typing a message below. I&apos;m here to help
                 with any questions you might have.
               </p>
             </div>
