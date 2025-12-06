@@ -189,9 +189,9 @@ GOOGLE_API_KEY=your_key_here
 - `claude-3-haiku-20240307` - Fast and efficient
 
 #### Google Gemini
-- `gemini-1.5-pro` - Most capable
-- `gemini-1.5-flash` - Fast and efficient
-- `gemini-pro` - Standard model
+- `gemini-2.5-pro` - Most capable (stable release)
+- `gemini-2.5-flash` - Fast and efficient (supports up to 1M tokens)
+- `gemini-2.0-flash` - Fast and versatile multimodal model
 
 ## 🔒 Security Notes
 

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         providers: [
           { id: "openai", name: "OpenAI", models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"] },
           { id: "anthropic", name: "Anthropic (Claude)", models: ["claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"] },
-          { id: "google", name: "Google (Gemini)", models: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"] },
+          { id: "google", name: "Google (Gemini)", models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"] },
         ],
       }),
       {
@@ -123,16 +123,32 @@ export async function POST(req: NextRequest) {
         )
       } else {
         const errorText = await testResponse.text()
-        return new Response(
-          JSON.stringify({
-            valid: false,
-            error: `API key validation failed: ${testResponse.status} ${errorText}`,
-          }),
-          {
-            status: 200, // Still 200, but with valid: false
-            headers: { "Content-Type": "application/json" },
-          }
-        )
+        // 429 (quota exceeded) means the key is valid but quota is exhausted
+        // 401/403 means the key is invalid
+        // 404 means the model/endpoint is not found
+        if (testResponse.status === 429) {
+          return new Response(
+            JSON.stringify({
+              valid: true,
+              message: "API key is valid, but quota exceeded. Please check your billing and quota limits.",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          )
+        } else {
+          return new Response(
+            JSON.stringify({
+              valid: false,
+              error: `API key validation failed: ${testResponse.status} ${errorText}`,
+            }),
+            {
+              status: 200, // Still 200, but with valid: false
+              headers: { "Content-Type": "application/json" },
+            }
+          )
+        }
       }
     } catch (error) {
       return new Response(
