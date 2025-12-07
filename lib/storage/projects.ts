@@ -20,23 +20,27 @@ export function getProjects(): Project[] {
   try {
     const stored = localStorage.getItem(PROJECTS_KEY)
     if (!stored) {
-      // Create default project if none exist
-      const defaultProject: Project = {
-        id: "default",
-        name: "Default Project",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-      saveProjects([defaultProject])
-      return [defaultProject]
+      // Don't auto-create a default project - allow users to chat without projects
+      return []
     }
 
     const parsed = JSON.parse(stored)
-    return parsed.map((p: any) => ({
+    const projects = parsed.map((p: any) => ({
       ...p,
       createdAt: new Date(p.createdAt),
       updatedAt: new Date(p.updatedAt),
     }))
+
+    // Migration: Remove auto-created "Default Project" if it's the only project
+    // This allows users to start fresh without any projects
+    if (projects.length === 1 && (projects[0].id === "default" || projects[0].name === "Default Project")) {
+      // Clear the default project
+      localStorage.removeItem(PROJECTS_KEY)
+      localStorage.removeItem("genai_active_project_id")
+      return []
+    }
+
+    return projects
   } catch (error) {
     console.error("Error loading projects:", error)
     return []
@@ -100,12 +104,6 @@ export function updateProject(projectId: string, updates: Partial<Project>): voi
  */
 export function deleteProject(projectId: string): void {
   const projects = getProjects()
-  
-  // Don't allow deleting the last project
-  if (projects.length <= 1) {
-    throw new Error("Cannot delete the last project")
-  }
-
   const filtered = projects.filter((p) => p.id !== projectId)
   saveProjects(filtered)
 }

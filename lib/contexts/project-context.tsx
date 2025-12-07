@@ -31,10 +31,15 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     const loadedProjects = getProjects()
     setProjects(loadedProjects)
 
-    // Set active project if none is set or if current one no longer exists
-    if (!activeProject || !loadedProjects.find((p) => p.id === activeProject.id)) {
-      setActiveProjectState(loadedProjects[0] || null)
-    } else {
+    // Only update active project if current one no longer exists
+    // Don't auto-select first project - allow null (no project selected)
+    if (activeProject && !loadedProjects.find((p) => p.id === activeProject.id)) {
+      // Current active project was deleted, clear it
+      setActiveProjectState(null)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("genai_active_project_id")
+      }
+    } else if (activeProject) {
       // Update active project with latest data
       const updated = loadedProjects.find((p) => p.id === activeProject.id)
       if (updated) {
@@ -47,30 +52,31 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     const loadedProjects = getProjects()
     setProjects(loadedProjects)
 
-    // Set active project if none is set or if current one no longer exists
-    if (!activeProject || !loadedProjects.find((p) => p.id === activeProject.id)) {
-      setActiveProjectState(loadedProjects[0] || null)
-    } else {
-      // Update active project with latest data
-      const updated = loadedProjects.find((p) => p.id === activeProject.id)
-      if (updated) {
-        setActiveProjectState(updated)
-      }
+    // Don't restore active project from localStorage - always start with no project selected
+    // This ensures independent chats are shown by default
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("genai_active_project_id")
     }
+    // Don't auto-select first project - allow null (no project selected)
   }, [])
 
   const setActiveProject = (project: Project | null) => {
     setActiveProjectState(project)
     // Store active project ID in localStorage for persistence
-    if (project && typeof window !== "undefined") {
-      localStorage.setItem("genai_active_project_id", project.id)
+    if (typeof window !== "undefined") {
+      if (project) {
+        localStorage.setItem("genai_active_project_id", project.id)
+      } else {
+        localStorage.removeItem("genai_active_project_id")
+      }
     }
   }
 
   const createNewProject = (name: string): Project => {
     const newProject = createProject(name)
     refreshProjects()
-    setActiveProject(newProject)
+    // Don't auto-select the new project - let user choose when to select it
+    // setActiveProject(newProject)
     return newProject
   }
 
@@ -82,10 +88,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const deleteProjectById = (projectId: string) => {
     deleteProject(projectId)
     refreshProjects()
-    // If deleted project was active, switch to first available
+    // If deleted project was active, clear it (don't auto-select another)
     if (activeProject?.id === projectId) {
-      const remaining = getProjects()
-      setActiveProject(remaining[0] || null)
+      setActiveProject(null)
     }
   }
 
@@ -94,18 +99,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     refreshProjects()
   }
 
-  // Restore active project from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined" && projects.length > 0 && !activeProject) {
-      const savedActiveId = localStorage.getItem("genai_active_project_id")
-      if (savedActiveId) {
-        const project = projects.find((p) => p.id === savedActiveId)
-        if (project) {
-          setActiveProjectState(project)
-        }
-      }
-    }
-  }, [projects.length, activeProject])
+  // This is now handled in the initial useEffect
 
   return (
     <ProjectContext.Provider

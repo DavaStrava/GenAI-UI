@@ -17,14 +17,16 @@ This guide walks you through demonstrating the MVP features of GenAI Chat UI.
 
 ---
 
-### Step 2: Project Creation (30 seconds)
+### Step 2: Project Creation (Optional - 30 seconds)
+
+**Note**: You can start chatting immediately without creating a project! Projects are optional and help organize your conversations.
 
 1. In the **Projects** sidebar, click **New Project**
 2. Enter project name: "Research Project"
 3. Click **Create**
 4. Notice the project appears in the sidebar
 
-**What to show**: "Projects help organize your conversations. You can create different projects for different topics or use cases."
+**What to show**: "Projects are optional - you can chat without them, just like ChatGPT. But if you want to organize your conversations, you can create different projects for different topics or use cases."
 
 ---
 

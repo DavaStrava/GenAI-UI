@@ -6,7 +6,6 @@ import { type Message } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
 import { ChatHeader } from "@/components/chat/chat-header"
 import { ProjectSidebar } from "@/components/projects/project-sidebar"
-import { ChatList } from "@/components/chats/chat-list"
 import { useLLM } from "@/lib/contexts/llm-context"
 import { useProject } from "@/lib/contexts/project-context"
 import {
@@ -21,21 +20,25 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
+  const [currentChatProjectId, setCurrentChatProjectId] = useState<string | null>(null)
+  const [pendingProjectId, setPendingProjectId] = useState<string | null>(null) // For project-specific chats
   const [chatListRefresh, setChatListRefresh] = useState(0)
   const { provider, model, temperature, maxTokens, getCurrentApiKey } = useLLM()
-  const { activeProject } = useProject()
+  const { activeProject, projects, setActiveProject } = useProject()
   const savingRef = useRef(false)
 
   // Save chat when messages change (debounced)
+  // Save to independent storage if no project, or to project if project is selected
   useEffect(() => {
-    if (!activeProject || messages.length === 0 || savingRef.current) return
+    if (messages.length === 0 || savingRef.current) return
 
     const timeoutId = setTimeout(() => {
       savingRef.current = true
       try {
         if (currentChatId) {
-          // Update existing chat
-          updateChat(activeProject.id, currentChatId, {
+          // Update existing chat - use the chat's projectId (stored when chat was loaded)
+          const projectId = currentChatProjectId
+          updateChat(projectId, currentChatId, {
             messages,
             llmProvider: provider,
             llmModel: model,
@@ -43,12 +46,12 @@ export default function Home() {
             maxTokens,
           })
         } else {
-          // Create new chat if we have messages but no chat ID
+          // Create new chat - use pendingProjectId if set (for project chats), otherwise null (independent)
+          const projectId = pendingProjectId !== null ? pendingProjectId : null
           const firstUserMessage = messages.find((m) => m.role === "user")
           if (firstUserMessage) {
             const chatName = generateChatName(firstUserMessage.content)
-            const newChat = createChat(activeProject.id, {
-              projectId: activeProject.id,
+            const newChat = createChat(projectId, {
               name: chatName,
               messages,
               llmProvider: provider,
@@ -57,6 +60,8 @@ export default function Home() {
               maxTokens,
             })
             setCurrentChatId(newChat.id)
+            setCurrentChatProjectId(projectId) // Store the projectId for this chat
+            setPendingProjectId(null) // Clear pending project ID after chat is created
             setChatListRefresh((prev) => prev + 1) // Trigger chat list refresh
           }
         }
@@ -68,27 +73,49 @@ export default function Home() {
     }, 1000) // Debounce by 1 second
 
     return () => clearTimeout(timeoutId)
-  }, [messages, activeProject, currentChatId, provider, model, temperature, maxTokens])
+  }, [messages, currentChatId, currentChatProjectId, pendingProjectId, provider, model, temperature, maxTokens])
 
-  // Load chat when selected
+  // Clear chat when project changes or is deselected (but don't clear if we're starting a project chat)
+  useEffect(() => {
+    // Only clear if we're not in the middle of starting a project-specific chat
+    if (pendingProjectId === null) {
+      setMessages([])
+      setCurrentChatId(null)
+      setCurrentChatProjectId(null)
+    }
+  }, [activeProject?.id, pendingProjectId])
+
+  // Load chat when selected from the list
   const handleSelectChat = useCallback((chat: Chat) => {
     setMessages(chat.messages)
     setCurrentChatId(chat.id)
+    setCurrentChatProjectId(chat.projectId) // Store the chat's projectId
     // Restore chat parameters if they exist
     // Note: We could restore temperature/maxTokens to context here if needed
   }, [])
 
-  // Create new chat
+  // Create new independent chat (not associated with any project)
   const handleNewChat = useCallback(() => {
     setMessages([])
     setCurrentChatId(null)
+    setCurrentChatProjectId(null)
+    setPendingProjectId(null) // Ensure it's an independent chat
   }, [])
 
-  // Reset chat when project changes
-  useEffect(() => {
+  // Create new project-specific chat
+  const handleNewProjectChat = useCallback((projectId: string) => {
+    // Set pending project ID first to prevent the project change effect from clearing the chat
+    setPendingProjectId(projectId)
+    // Find and set the active project
+    const project = projects.find((p) => p.id === projectId)
+    if (project) {
+      setActiveProject(project)
+    }
+    // Clear current chat state
     setMessages([])
     setCurrentChatId(null)
-  }, [activeProject?.id])
+    setCurrentChatProjectId(null)
+  }, [projects, setActiveProject])
 
   const handleSendMessage = useCallback(async (content: string) => {
     const userMessage: Message = {
@@ -218,43 +245,33 @@ export default function Home() {
   const handleClear = useCallback(() => {
     setMessages([])
     setCurrentChatId(null)
+    setCurrentChatProjectId(null)
   }, [])
 
-  // Update chat name when first message is sent
+  // Update chat name when first message is sent (for both independent and project chats)
   useEffect(() => {
     if (
       currentChatId &&
-      activeProject &&
       messages.length === 1 &&
       messages[0].role === "user"
     ) {
+      const projectId = currentChatProjectId
       const chatName = generateChatName(messages[0].content)
-      updateChat(activeProject.id, currentChatId, { name: chatName })
+      updateChat(projectId, currentChatId, { name: chatName })
     }
-  }, [messages, currentChatId, activeProject])
+  }, [messages, currentChatId, currentChatProjectId])
 
   return (
     <div className="flex flex-col h-screen">
       <ChatHeader onClear={handleClear} messageCount={messages.length} />
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex">
-          <ProjectSidebar />
-          <div className="w-64 border-r bg-muted/20 flex flex-col">
-            <div className="p-2 border-b">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase">
-                Chats
-              </h3>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <ChatList
-                selectedChatId={currentChatId}
-                onSelectChat={handleSelectChat}
-                onCreateNewChat={handleNewChat}
-                refreshTrigger={chatListRefresh}
-              />
-            </div>
-          </div>
-        </div>
+        <ProjectSidebar
+          onNewProjectChat={handleNewProjectChat}
+          selectedChatId={currentChatId}
+          onSelectChat={handleSelectChat}
+          onCreateNewChat={handleNewChat}
+          chatListRefresh={chatListRefresh}
+        />
         <div className="flex flex-col flex-1 min-w-0">
           <ChatContainer messages={messages} isLoading={isLoading} />
           <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
