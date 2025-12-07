@@ -189,9 +189,11 @@ GOOGLE_API_KEY=your_key_here
 - `claude-3-haiku-20240307` - Fast and efficient
 
 #### Google Gemini
-- `gemini-2.5-pro` - Most capable (stable release)
-- `gemini-2.5-flash` - Fast and efficient (supports up to 1M tokens)
+- `gemini-2.5-pro` - Most capable (stable release) ⚠️ Very low free tier limits
+- `gemini-2.5-flash` - Fast and efficient (supports up to 1M tokens) ✅ Recommended for free tier
 - `gemini-2.0-flash` - Fast and versatile multimodal model
+
+**Note**: For free tier usage, `gemini-2.5-flash` is recommended as it has much higher quota limits than `gemini-2.5-pro`.
 
 ## 🔒 Security Notes
 
@@ -213,22 +215,26 @@ GOOGLE_API_KEY=your_key_here
 
 ## 🐛 Troubleshooting
 
-### API Key Errors
+For detailed troubleshooting information, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
 
+### Quick Fixes
+
+**API Key Errors:**
 - **"API key is required"**: Go to Settings and configure your API keys
 - **"API key validation failed"**: Check that your key is correct and has the right permissions
 - **Rate Limit Errors**: You've exceeded your API quota - wait or upgrade your plan
 
-### Storage Issues
-
+**Storage Issues:**
 - **Chats not saving**: Check browser localStorage quota (usually 5-10MB)
 - **Data lost**: All data is stored locally - clearing browser data will delete it
 
-### Build Errors
-
+**Build Errors:**
 - Run `npm install` to ensure all dependencies are installed
 - Check Node.js version (requires 18+)
 - Clear `.next` folder and rebuild: `rm -rf .next && npm run build`
+
+**Dropdown/UI Issues:**
+- If dropdown menus are not clickable, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#dropdown-menu-click-issues) for the solution
 
 ## 🚧 Known Limitations (MVP)
 

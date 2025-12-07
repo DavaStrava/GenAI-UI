@@ -22,3 +22,6 @@ export function decrypt(encryptedText: string): string {
   return bytes.toString(CryptoJS.enc.Utf8)
 }
 
+
+
+

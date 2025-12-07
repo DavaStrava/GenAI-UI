@@ -133,6 +133,11 @@ export function ChatList({
               ) : (
                 <button
                   onClick={() => onSelectChat(chat)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setContextMenuId(chat.id)
+                  }}
                   className={`w-full flex items-start justify-between px-2 py-1.5 rounded text-sm hover:bg-accent group/item ${
                     isSelected ? "bg-accent font-medium" : ""
                   }`}
@@ -148,10 +153,11 @@ export function ChatList({
                   </div>
                   <button
                     onClick={(e) => {
+                      e.preventDefault()
                       e.stopPropagation()
                       setContextMenuId(contextMenuId === chat.id ? null : chat.id)
                     }}
-                    className="p-1 hover:bg-accent rounded opacity-0 group-hover/item:opacity-100 transition-opacity"
+                    className="p-1 hover:bg-accent rounded opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
                   >
                     <MoreVertical className="h-3 w-3" />
                   </button>
@@ -159,22 +165,40 @@ export function ChatList({
               )}
 
               {showContextMenu && !isEditing && (
-                <div className="absolute left-full ml-1 top-0 w-40 bg-background border border-border rounded-md shadow-lg z-10">
-                  <button
-                    onClick={() => handleRename(chat)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-t-md"
-                  >
-                    <Edit2 className="h-3 w-3" />
-                    Rename
-                  </button>
-                  <button
-                    onClick={() => handleDelete(chat.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-red-600 rounded-b-md"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    Delete
-                  </button>
-                </div>
+                <>
+                  {/* Backdrop to close menu when clicking outside */}
+                  <div
+                    className="fixed inset-0 z-[40]"
+                    onClick={() => setContextMenuId(null)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setContextMenuId(null)
+                    }}
+                  />
+                  {/* Context menu */}
+                  <div className="absolute right-0 top-0 w-40 bg-background border border-border rounded-md shadow-lg z-[50]">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRename(chat)
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent rounded-t-md"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                      Rename
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(chat.id)
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent text-red-600 rounded-b-md"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )
