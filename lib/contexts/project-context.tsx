@@ -1,24 +1,25 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect } from "react"
-import {
-  getProjects,
-  createProject,
-  updateProject,
-  deleteProject,
-  renameProject,
-  type Project,
-} from "@/lib/storage/projects"
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
+
+// Project type matching the Prisma model
+export interface Project {
+  id: string
+  name: string
+  createdAt: Date | string
+  updatedAt: Date | string
+}
 
 interface ProjectContextType {
   projects: Project[]
   activeProject: Project | null
+  isLoading: boolean
   setActiveProject: (project: Project | null) => void
-  createNewProject: (name: string) => Project
-  updateProjectById: (projectId: string, updates: Partial<Project>) => void
-  deleteProjectById: (projectId: string) => void
-  renameProjectById: (projectId: string, newName: string) => void
-  refreshProjects: () => void
+  createNewProject: (name: string) => Promise<Project>
+  updateProjectById: (projectId: string, updates: Partial<Project>) => Promise<void>
+  deleteProjectById: (projectId: string) => Promise<void>
+  renameProjectById: (projectId: string, newName: string) => Promise<void>
+  refreshProjects: () => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
@@ -26,43 +27,59 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [activeProject, setActiveProjectState] = useState<Project | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const refreshProjects = () => {
-    const loadedProjects = getProjects()
-    setProjects(loadedProjects)
+  const refreshProjects = useCallback(async () => {
+    try {
+      const response = await fetch("/api/projects")
+      if (response.ok) {
+        const loadedProjects = await response.json()
+        setProjects(loadedProjects)
 
-    // Only update active project if current one no longer exists
-    // Don't auto-select first project - allow null (no project selected)
-    if (activeProject && !loadedProjects.find((p) => p.id === activeProject.id)) {
-      // Current active project was deleted, clear it
-      setActiveProjectState(null)
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("genai_active_project_id")
+        // Only update active project if current one no longer exists
+        if (activeProject && !loadedProjects.find((p: Project) => p.id === activeProject.id)) {
+          setActiveProjectState(null)
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("genai_active_project_id")
+          }
+        } else if (activeProject) {
+          const updated = loadedProjects.find((p: Project) => p.id === activeProject.id)
+          if (updated) {
+            setActiveProjectState(updated)
+          }
+        }
       }
-    } else if (activeProject) {
-      // Update active project with latest data
-      const updated = loadedProjects.find((p) => p.id === activeProject.id)
-      if (updated) {
-        setActiveProjectState(updated)
-      }
+    } catch (error) {
+      console.error("Error fetching projects:", error)
     }
-  }
+  }, [activeProject])
 
   useEffect(() => {
-    const loadedProjects = getProjects()
-    setProjects(loadedProjects)
+    const loadProjects = async () => {
+      setIsLoading(true)
+      try {
+        const response = await fetch("/api/projects")
+        if (response.ok) {
+          const loadedProjects = await response.json()
+          setProjects(loadedProjects)
+        }
+      } catch (error) {
+        console.error("Error loading projects:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadProjects()
 
     // Don't restore active project from localStorage - always start with no project selected
-    // This ensures independent chats are shown by default
     if (typeof window !== "undefined") {
       localStorage.removeItem("genai_active_project_id")
     }
-    // Don't auto-select first project - allow null (no project selected)
   }, [])
 
   const setActiveProject = (project: Project | null) => {
     setActiveProjectState(project)
-    // Store active project ID in localStorage for persistence
     if (typeof window !== "undefined") {
       if (project) {
         localStorage.setItem("genai_active_project_id", project.id)
@@ -72,40 +89,62 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const createNewProject = (name: string): Project => {
-    const newProject = createProject(name)
-    refreshProjects()
-    // Don't auto-select the new project - let user choose when to select it
-    // setActiveProject(newProject)
+  const createNewProject = async (name: string): Promise<Project> => {
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to create project")
+    }
+
+    const newProject = await response.json()
+    await refreshProjects()
     return newProject
   }
 
-  const updateProjectById = (projectId: string, updates: Partial<Project>) => {
-    updateProject(projectId, updates)
-    refreshProjects()
+  const updateProjectById = async (projectId: string, updates: Partial<Project>) => {
+    const response = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to update project")
+    }
+
+    await refreshProjects()
   }
 
-  const deleteProjectById = (projectId: string) => {
-    deleteProject(projectId)
-    refreshProjects()
-    // If deleted project was active, clear it (don't auto-select another)
+  const deleteProjectById = async (projectId: string) => {
+    const response = await fetch(`/api/projects/${projectId}`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to delete project")
+    }
+
+    await refreshProjects()
+
     if (activeProject?.id === projectId) {
       setActiveProject(null)
     }
   }
 
-  const renameProjectById = (projectId: string, newName: string) => {
-    renameProject(projectId, newName)
-    refreshProjects()
+  const renameProjectById = async (projectId: string, newName: string) => {
+    await updateProjectById(projectId, { name: newName })
   }
-
-  // This is now handled in the initial useEffect
 
   return (
     <ProjectContext.Provider
       value={{
         projects,
         activeProject,
+        isLoading,
         setActiveProject,
         createNewProject,
         updateProjectById,
@@ -126,4 +165,3 @@ export function useProject() {
   }
   return context
 }
-

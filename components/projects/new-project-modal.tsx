@@ -7,7 +7,7 @@ import { X } from "lucide-react"
 interface NewProjectModalProps {
   isOpen: boolean
   onClose: () => void
-  onCreate: (name: string) => void
+  onCreate: (name: string) => void | Promise<void>
 }
 
 export function NewProjectModal({
@@ -26,7 +26,7 @@ export function NewProjectModal({
 
     setIsCreating(true)
     try {
-      onCreate(name.trim())
+      await onCreate(name.trim())
       setName("")
       onClose()
     } catch (error) {

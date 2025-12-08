@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// User model for future multi-user support
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+  chats    Chat[]
+  settings UserSettings?
+}
+
+// Project model
+model Project {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chats          Chat[]
+  knowledgeBases KnowledgeBase[]
+}
+
+// Chat model
+model Chat {
+  id          String   @id @default(cuid())
+  name        String
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  llmProvider String
+  llmModel    String
+  temperature Float?   @default(0.7)
+  maxTokens   Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages Message[]
+}
+
+// Message model
+model Message {
+  id        String   @id @default(cuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  role      String // "user" | "assistant" | "system"
+  content   String
+  timestamp DateTime @default(now())
+}
+
+// User Settings model (for API keys and preferences)
+model UserSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultProvider String?  @default("openai")
+  defaultModel    String?  @default("gpt-4o-mini")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  apiKeys ApiKey[]
+}
+
+// API Key model (encrypted keys for each provider)
+model ApiKey {
+  id             String       @id @default(cuid())
+  provider       String // "openai" | "anthropic" | "google"
+  encryptedKey   String // Encrypted API key
+  settingsId     String
+  settings       UserSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([settingsId, provider])
+}
+
+// Knowledge Base model (for future RAG features)
+model KnowledgeBase {
+  id        String   @id @default(cuid())
+  name      String
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents Document[]
+}
+
+// Document model (for knowledge base documents)
+model Document {
+  id              String        @id @default(cuid())
+  name            String
+  filePath        String
+  fileType        String
+  knowledgeBaseId String
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// Workflow model (for future workflow builder)
+model Workflow {
+  id        String         @id @default(cuid())
+  name      String
+  steps     WorkflowStep[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+// Workflow Step model
+model WorkflowStep {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  order      Int
+  type       String // "llm" | "condition" | "transform"
+  config     String // JSON config
+  createdAt  DateTime @default(now())
+}

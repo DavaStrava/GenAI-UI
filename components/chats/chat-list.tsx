@@ -1,10 +1,28 @@
 "use client"
 
 import { useProject } from "@/lib/contexts/project-context"
-import { getChats, getIndependentChats, deleteChat, renameChat, type Chat } from "@/lib/storage/chats"
-import { useState, useEffect } from "react"
-import { MessageSquare, MoreVertical, Edit2, Trash2, Plus, Folder, MessageCircle } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { MessageSquare, MoreVertical, Edit2, Trash2, Plus, Folder, MessageCircle, Loader2 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+
+// Chat type matching the database model
+export interface Chat {
+  id: string
+  projectId: string | null
+  name: string
+  llmProvider: string
+  llmModel: string
+  temperature?: number
+  maxTokens?: number
+  createdAt: Date | string
+  updatedAt: Date | string
+  messages: Array<{
+    id: string
+    role: string
+    content: string
+    timestamp: Date | string
+  }>
+}
 
 interface ChatListProps {
   selectedChatId: string | null
@@ -20,37 +38,52 @@ export function ChatList({
   refreshTrigger,
 }: ChatListProps) {
   const { activeProject } = useProject()
-  const [projectChats, setProjectChats] = useState<Chat[]>([])
-  const [independentChats, setIndependentChats] = useState<Chat[]>([])
+  const [chats, setChats] = useState<Chat[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
   const [contextMenuId, setContextMenuId] = useState<string | null>(null)
 
-  const refreshChats = () => {
-    if (activeProject) {
-      // When a project is active, only load project chats
-      const project = getChats(activeProject.id)
-      setProjectChats(project)
-      setIndependentChats([])
-    } else {
-      // When no project is active, only load independent chats
-      const independent = getIndependentChats()
-      setIndependentChats(independent)
-      setProjectChats([])
+  const refreshChats = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const projectIdParam = activeProject ? activeProject.id : "null"
+      const response = await fetch(`/api/chats?projectId=${projectIdParam}`)
+      if (response.ok) {
+        const data = await response.json()
+        // Convert null to undefined for optional fields
+        const normalizedChats: Chat[] = data.map((chat: any) => ({
+          ...chat,
+          temperature: chat.temperature ?? undefined,
+          maxTokens: chat.maxTokens ?? undefined,
+        }))
+        setChats(normalizedChats)
+      }
+    } catch (error) {
+      console.error("Error fetching chats:", error)
+    } finally {
+      setIsLoading(false)
     }
-  }
+  }, [activeProject])
 
   useEffect(() => {
     refreshChats()
-  }, [activeProject, refreshTrigger])
+  }, [refreshChats, refreshTrigger])
 
-  const handleDelete = (chat: Chat) => {
-    const projectId = chat.projectId
+  const handleDelete = async (chat: Chat) => {
     if (confirm("Are you sure you want to delete this chat?")) {
-      deleteChat(projectId, chat.id)
-      refreshChats()
-      if (selectedChatId === chat.id) {
-        onCreateNewChat()
+      try {
+        const response = await fetch(`/api/chats/${chat.id}`, {
+          method: "DELETE",
+        })
+        if (response.ok) {
+          await refreshChats()
+          if (selectedChatId === chat.id) {
+            onCreateNewChat()
+          }
+        }
+      } catch (error) {
+        console.error("Error deleting chat:", error)
       }
     }
     setContextMenuId(null)
@@ -62,11 +95,20 @@ export function ChatList({
     setContextMenuId(null)
   }
 
-  const handleSaveRename = (chat: Chat) => {
+  const handleSaveRename = async (chat: Chat) => {
     if (!editingName.trim()) return
-    const projectId = chat.projectId
-    renameChat(projectId, chat.id, editingName.trim())
-    refreshChats()
+    try {
+      const response = await fetch(`/api/chats/${chat.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editingName.trim() }),
+      })
+      if (response.ok) {
+        await refreshChats()
+      }
+    } catch (error) {
+      console.error("Error renaming chat:", error)
+    }
     setEditingId(null)
     setEditingName("")
   }
@@ -76,7 +118,6 @@ export function ChatList({
     setEditingName("")
   }
 
-  // Render a single chat item
   const renderChatItem = (chat: Chat) => {
     const isSelected = selectedChatId === chat.id
     const isEditing = editingId === chat.id
@@ -136,7 +177,7 @@ export function ChatList({
                 {chat.name}
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{formatDistanceToNow(chat.updatedAt, { addSuffix: true })}</span>
+                <span>{formatDistanceToNow(new Date(chat.updatedAt), { addSuffix: true })}</span>
                 <span>•</span>
                 <span className="truncate">{chat.llmProvider}/{chat.llmModel}</span>
               </div>
@@ -156,7 +197,6 @@ export function ChatList({
 
         {showContextMenu && !isEditing && (
           <>
-            {/* Backdrop to close menu when clicking outside */}
             <div
               className="fixed inset-0 z-[40]"
               onClick={() => setContextMenuId(null)}
@@ -165,7 +205,6 @@ export function ChatList({
                 setContextMenuId(null)
               }}
             />
-            {/* Context menu */}
             <div className="absolute right-0 top-0 w-44 bg-popover border border-border rounded-lg shadow-lg z-[50] py-1">
               <button
                 onClick={(e) => {
@@ -194,13 +233,10 @@ export function ChatList({
     )
   }
 
-  // Show either project chats or independent chats, never both
-  const currentChats = activeProject ? projectChats : independentChats
-  const hasAnyChats = currentChats.length > 0
+  const hasAnyChats = chats.length > 0
 
   return (
     <div className="flex flex-col h-full">
-      {/* New Chat Button */}
       <div className="p-3 border-b">
         <button
           onClick={onCreateNewChat}
@@ -211,9 +247,13 @@ export function ChatList({
         </button>
       </div>
 
-      {/* Chat List */}
       <div className="flex-1 overflow-y-auto p-3">
-        {!hasAnyChats ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <Loader2 className="h-8 w-8 text-muted-foreground/40 animate-spin mb-3" />
+            <p className="text-sm text-muted-foreground">Loading chats...</p>
+          </div>
+        ) : !hasAnyChats ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <MessageSquare className="h-12 w-12 text-muted-foreground/40 mb-3" />
             <p className="text-sm font-medium text-foreground mb-1">No chats yet</p>
@@ -221,7 +261,6 @@ export function ChatList({
           </div>
         ) : (
           <div>
-            {/* Section header */}
             <div className="flex items-center gap-2 px-3 mb-3">
               {activeProject ? (
                 <>
@@ -239,11 +278,10 @@ export function ChatList({
                 </>
               )}
               <div className="flex-1 h-px bg-border"></div>
-              <span className="text-xs text-muted-foreground/60">{currentChats.length}</span>
+              <span className="text-xs text-muted-foreground/60">{chats.length}</span>
             </div>
-            {/* Chat items */}
             <div className="space-y-1.5">
-              {currentChats.map(renderChatItem)}
+              {chats.map(renderChatItem)}
             </div>
           </div>
         )}
@@ -251,4 +289,3 @@ export function ChatList({
     </div>
   )
 }
-

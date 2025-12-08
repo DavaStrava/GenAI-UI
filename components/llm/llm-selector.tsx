@@ -1,17 +1,17 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { useLLM } from "@/lib/contexts/llm-context"
 import { Button } from "@/components/ui/button"
 import { Check, ChevronDown, Sparkles } from "lucide-react"
-import { getApiKey } from "@/lib/storage/settings"
 
 export function LLMSelector() {
-  const { provider, model, setProvider, setModel, availableProviders, getCurrentApiKey } = useLLM()
+  const { provider, model, setProvider, setModel, availableProviders } = useLLM()
   const [isOpen, setIsOpen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 })
+  const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({})
   const buttonRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -19,6 +19,25 @@ export function LLMSelector() {
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Fetch API key status for all providers
+  const fetchApiKeyStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/settings/db")
+      if (response.ok) {
+        const data = await response.json()
+        setApiKeyStatus(data.hasApiKey || {})
+      }
+    } catch (error) {
+      console.error("Error fetching API key status:", error)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isMounted) {
+      fetchApiKeyStatus()
+    }
+  }, [isMounted, fetchApiKeyStatus])
 
   // Calculate dropdown position when opening
   useEffect(() => {
@@ -46,7 +65,6 @@ export function LLMSelector() {
       }
     }
 
-    // Use capture phase to catch events before they bubble
     document.addEventListener('mousedown', handleClickOutside, true)
     return () => {
       document.removeEventListener('mousedown', handleClickOutside, true)
@@ -54,8 +72,7 @@ export function LLMSelector() {
   }, [isOpen])
 
   const currentProvider = availableProviders.find((p) => p.id === provider)
-  const currentApiKey = isMounted ? getCurrentApiKey() : undefined
-  const hasApiKey = !!currentApiKey
+  const hasApiKey = apiKeyStatus[provider] || false
 
   const handleProviderChange = (providerId: string) => {
     setProvider(providerId)
@@ -66,7 +83,6 @@ export function LLMSelector() {
     setModel(modelId)
     setIsOpen(false)
   }
-
 
   if (!currentProvider) {
     return null
@@ -94,13 +110,11 @@ export function LLMSelector() {
 
       {isOpen && isMounted && createPortal(
         <>
-          {/* Backdrop */}
           <div
             className="fixed inset-0 z-[9998]"
             onClick={() => setIsOpen(false)}
           />
           
-          {/* Dropdown */}
           <div 
             ref={dropdownRef}
             className="fixed w-64 bg-background border border-border rounded-lg shadow-lg z-[9999]"
@@ -115,7 +129,7 @@ export function LLMSelector() {
                 Provider
               </div>
               {availableProviders.map((p) => {
-                const hasKey = isMounted ? !!getApiKey(p.id) : false
+                const hasKey = apiKeyStatus[p.id] || false
                 const isSelected = p.id === provider
                 return (
                   <button
@@ -174,4 +188,3 @@ export function LLMSelector() {
     </div>
   )
 }
-

@@ -137,18 +137,40 @@ export async function POST(req: NextRequest) {
               headers: { "Content-Type": "application/json" },
             }
           )
-        } else {
-          return new Response(
-            JSON.stringify({
-              valid: false,
-              error: `API key validation failed: ${testResponse.status} ${errorText}`,
-            }),
-            {
-              status: 200, // Still 200, but with valid: false
-              headers: { "Content-Type": "application/json" },
-            }
-          )
         }
+        
+        // Check for Anthropic credit balance error (returns 400 but key is valid)
+        // The key authenticated successfully but the account has billing issues
+        if (provider === "anthropic" && testResponse.status === 400) {
+          try {
+            const errorJson = JSON.parse(errorText)
+            if (errorJson?.error?.message?.includes("credit balance")) {
+              return new Response(
+                JSON.stringify({
+                  valid: true,
+                  message: "API key is valid, but your Anthropic account needs credits. Visit console.anthropic.com to add credits or check your billing settings.",
+                }),
+                {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                }
+              )
+            }
+          } catch {
+            // If we can't parse the error, fall through to default handling
+          }
+        }
+        
+        return new Response(
+          JSON.stringify({
+            valid: false,
+            error: `API key validation failed: ${testResponse.status} ${errorText}`,
+          }),
+          {
+            status: 200, // Still 200, but with valid: false
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       }
     } catch (error) {
       return new Response(

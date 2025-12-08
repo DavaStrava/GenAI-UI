@@ -5,64 +5,107 @@ import { ChatContainer } from "@/components/chat/chat-container"
 import { type Message } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
 import { ChatHeader } from "@/components/chat/chat-header"
-import { ProjectSidebar } from "@/components/projects/project-sidebar"
+import { ProjectSidebar, type SidebarChat } from "@/components/projects/project-sidebar"
 import { useLLM } from "@/lib/contexts/llm-context"
 import { useProject } from "@/lib/contexts/project-context"
-import {
-  createChat,
-  updateChat,
-  getChat,
-  generateChatName,
-  type Chat,
-} from "@/lib/storage/chats"
+
+// Helper to generate chat name from first message
+function generateChatName(firstMessage: string): string {
+  const maxLength = 50
+  const trimmed = firstMessage.trim()
+  if (trimmed.length <= maxLength) {
+    return trimmed
+  }
+  return trimmed.slice(0, maxLength - 3) + "..."
+}
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const [currentChatProjectId, setCurrentChatProjectId] = useState<string | null>(null)
-  const [pendingProjectId, setPendingProjectId] = useState<string | null>(null) // For project-specific chats
+  const [pendingProjectId, setPendingProjectId] = useState<string | null>(null)
   const [chatListRefresh, setChatListRefresh] = useState(0)
   const { provider, model, temperature, maxTokens, getCurrentApiKey } = useLLM()
   const { activeProject, projects, setActiveProject } = useProject()
   const savingRef = useRef(false)
 
   // Save chat when messages change (debounced)
-  // Save to independent storage if no project, or to project if project is selected
   useEffect(() => {
     if (messages.length === 0 || savingRef.current) return
 
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       savingRef.current = true
       try {
         if (currentChatId) {
-          // Update existing chat - use the chat's projectId (stored when chat was loaded)
-          const projectId = currentChatProjectId
-          updateChat(projectId, currentChatId, {
-            messages,
-            llmProvider: provider,
-            llmModel: model,
-            temperature,
-            maxTokens,
-          })
-        } else {
-          // Create new chat - use pendingProjectId if set (for project chats), otherwise null (independent)
-          const projectId = pendingProjectId !== null ? pendingProjectId : null
-          const firstUserMessage = messages.find((m) => m.role === "user")
-          if (firstUserMessage) {
-            const chatName = generateChatName(firstUserMessage.content)
-            const newChat = createChat(projectId, {
-              name: chatName,
-              messages,
+          // Update existing chat
+          await fetch(`/api/chats/${currentChatId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
               llmProvider: provider,
               llmModel: model,
               temperature,
               maxTokens,
+            }),
+          })
+
+          // Add messages to chat
+          const existingMessages = await fetch(`/api/chats/${currentChatId}/messages`).then(r => r.json())
+          const existingIds = new Set(existingMessages.map((m: any) => m.id))
+          
+          for (const msg of messages) {
+            if (!existingIds.has(msg.id)) {
+              await fetch(`/api/chats/${currentChatId}/messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  role: msg.role,
+                  content: msg.content,
+                }),
+              })
+            }
+          }
+        } else {
+          // Create new chat
+          const projectId = pendingProjectId !== null ? pendingProjectId : null
+          const firstUserMessage = messages.find((m) => m.role === "user")
+          if (firstUserMessage) {
+            const chatName = generateChatName(firstUserMessage.content)
+            
+            const response = await fetch("/api/chats", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: chatName,
+                projectId,
+                llmProvider: provider,
+                llmModel: model,
+                temperature,
+                maxTokens,
+              }),
             })
-            setCurrentChatId(newChat.id)
-            setCurrentChatProjectId(projectId) // Store the projectId for this chat
-            setPendingProjectId(null) // Clear pending project ID after chat is created
-            setChatListRefresh((prev) => prev + 1) // Trigger chat list refresh
+
+            if (response.ok) {
+              const newChat = await response.json()
+              setCurrentChatId(newChat.id)
+              setCurrentChatProjectId(projectId)
+              setPendingProjectId(null)
+
+              // Add messages to the new chat
+              for (const msg of messages) {
+                await fetch(`/api/chats/${newChat.id}/messages`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    role: msg.role,
+                    content: msg.content,
+                  }),
+                })
+              }
+
+              setChatListRefresh((prev) => prev + 1)
+            }
           }
         }
       } catch (error) {
@@ -70,14 +113,13 @@ export default function Home() {
       } finally {
         savingRef.current = false
       }
-    }, 1000) // Debounce by 1 second
+    }, 1000)
 
     return () => clearTimeout(timeoutId)
   }, [messages, currentChatId, currentChatProjectId, pendingProjectId, provider, model, temperature, maxTokens])
 
-  // Clear chat when project changes or is deselected (but don't clear if we're starting a project chat)
+  // Clear chat when project changes or is deselected
   useEffect(() => {
-    // Only clear if we're not in the middle of starting a project-specific chat
     if (pendingProjectId === null) {
       setMessages([])
       setCurrentChatId(null)
@@ -86,32 +128,35 @@ export default function Home() {
   }, [activeProject?.id, pendingProjectId])
 
   // Load chat when selected from the list
-  const handleSelectChat = useCallback((chat: Chat) => {
-    setMessages(chat.messages)
+  const handleSelectChat = useCallback((chat: SidebarChat) => {
+    const mappedMessages: Message[] = chat.messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({
+        id: m.id,
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        timestamp: new Date(m.timestamp),
+      }))
+    setMessages(mappedMessages)
     setCurrentChatId(chat.id)
-    setCurrentChatProjectId(chat.projectId) // Store the chat's projectId
-    // Restore chat parameters if they exist
-    // Note: We could restore temperature/maxTokens to context here if needed
+    setCurrentChatProjectId(chat.projectId)
   }, [])
 
-  // Create new independent chat (not associated with any project)
+  // Create new independent chat
   const handleNewChat = useCallback(() => {
     setMessages([])
     setCurrentChatId(null)
     setCurrentChatProjectId(null)
-    setPendingProjectId(null) // Ensure it's an independent chat
+    setPendingProjectId(null)
   }, [])
 
   // Create new project-specific chat
   const handleNewProjectChat = useCallback((projectId: string) => {
-    // Set pending project ID first to prevent the project change effect from clearing the chat
     setPendingProjectId(projectId)
-    // Find and set the active project
     const project = projects.find((p) => p.id === projectId)
     if (project) {
       setActiveProject(project)
     }
-    // Clear current chat state
     setMessages([])
     setCurrentChatId(null)
     setCurrentChatProjectId(null)
@@ -128,7 +173,7 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage])
     setIsLoading(true)
 
-    const apiKey = getCurrentApiKey()
+    const apiKey = await getCurrentApiKey()
 
     if (!apiKey) {
       const errorMessage: Message = {
@@ -216,11 +261,9 @@ export default function Home() {
                 })
               }
             } catch (e) {
-              // If it's an error from the API, show it
               if (e instanceof Error && e.message !== "Unexpected end of JSON input") {
                 throw e
               }
-              // Otherwise ignore JSON parse errors for incomplete chunks
             }
           }
         }
@@ -248,18 +291,21 @@ export default function Home() {
     setCurrentChatProjectId(null)
   }, [])
 
-  // Update chat name when first message is sent (for both independent and project chats)
+  // Update chat name when first message is sent
   useEffect(() => {
     if (
       currentChatId &&
       messages.length === 1 &&
       messages[0].role === "user"
     ) {
-      const projectId = currentChatProjectId
       const chatName = generateChatName(messages[0].content)
-      updateChat(projectId, currentChatId, { name: chatName })
+      fetch(`/api/chats/${currentChatId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: chatName }),
+      }).catch(console.error)
     }
-  }, [messages, currentChatId, currentChatProjectId])
+  }, [messages, currentChatId])
 
   return (
     <div className="flex flex-col h-screen">
@@ -280,4 +326,3 @@ export default function Home() {
     </div>
   )
 }
-

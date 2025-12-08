@@ -1,17 +1,35 @@
 "use client"
 
 import { useState } from "react"
-import { useProject } from "@/lib/contexts/project-context"
+import { useProject, type Project } from "@/lib/contexts/project-context"
 import { Button } from "@/components/ui/button"
-import { Plus, MoreVertical, Edit2, Trash2, MessageSquare, Folder } from "lucide-react"
+import { Plus, MoreVertical, Edit2, Trash2, MessageSquare, Folder, Loader2 } from "lucide-react"
 import { NewProjectModal } from "./new-project-modal"
 import { ChatList } from "@/components/chats/chat-list"
-import type { Chat } from "@/lib/storage/chats"
+
+// Chat type for the sidebar
+export interface SidebarChat {
+  id: string
+  projectId: string | null
+  name: string
+  llmProvider: string
+  llmModel: string
+  temperature?: number
+  maxTokens?: number
+  createdAt: Date | string
+  updatedAt: Date | string
+  messages: Array<{
+    id: string
+    role: string
+    content: string
+    timestamp: Date | string
+  }>
+}
 
 interface ProjectSidebarProps {
   onNewProjectChat?: (projectId: string) => void
   selectedChatId: string | null
-  onSelectChat: (chat: Chat) => void
+  onSelectChat: (chat: SidebarChat) => void
   onCreateNewChat: () => void
   chatListRefresh?: number
 }
@@ -26,6 +44,7 @@ export function ProjectSidebar({
   const {
     projects,
     activeProject,
+    isLoading,
     setActiveProject,
     createNewProject,
     deleteProjectById,
@@ -35,15 +54,23 @@ export function ProjectSidebar({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
   const [contextMenuId, setContextMenuId] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
 
-  const handleCreateProject = (name: string) => {
-    createNewProject(name)
+  const handleCreateProject = async (name: string) => {
+    setIsCreating(true)
+    try {
+      await createNewProject(name)
+    } catch (error) {
+      console.error("Failed to create project:", error)
+    } finally {
+      setIsCreating(false)
+    }
   }
 
-  const handleDelete = (projectId: string) => {
+  const handleDelete = async (projectId: string) => {
     if (confirm("Are you sure you want to delete this project?")) {
       try {
-        deleteProjectById(projectId)
+        await deleteProjectById(projectId)
       } catch (error: any) {
         alert(error.message || "Failed to delete project")
       }
@@ -60,9 +87,13 @@ export function ProjectSidebar({
     }
   }
 
-  const handleSaveRename = (projectId: string) => {
+  const handleSaveRename = async (projectId: string) => {
     if (editingName.trim()) {
-      renameProjectById(projectId, editingName.trim())
+      try {
+        await renameProjectById(projectId, editingName.trim())
+      } catch (error) {
+        console.error("Failed to rename project:", error)
+      }
     }
     setEditingId(null)
     setEditingName("")
@@ -85,14 +116,24 @@ export function ProjectSidebar({
               size="sm"
               className="w-full border-dashed"
               onClick={() => setIsModalOpen(true)}
+              disabled={isCreating}
             >
-              <Plus className="h-4 w-4 mr-2" />
+              {isCreating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
               New Project
             </Button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-            {projects.length === 0 ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+                <Loader2 className="h-8 w-8 text-muted-foreground/40 animate-spin mb-2" />
+                <p className="text-xs text-muted-foreground">Loading projects...</p>
+              </div>
+            ) : projects.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
                 <Folder className="h-10 w-10 text-muted-foreground/40 mb-2" />
                 <p className="text-xs text-muted-foreground">No projects yet</p>
@@ -109,7 +150,6 @@ export function ProjectSidebar({
                     key={project.id}
                     className="group relative"
                     onBlur={(e) => {
-                      // Close context menu when clicking outside
                       if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                         setContextMenuId(null)
                       }
@@ -137,7 +177,6 @@ export function ProjectSidebar({
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => {
-                            // Toggle: if already active, deselect it; otherwise select it
                             if (isActive) {
                               setActiveProject(null)
                             } else {
@@ -159,7 +198,7 @@ export function ProjectSidebar({
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              onNewProjectChat(project.id) // This will handle setting the active project
+                              onNewProjectChat(project.id)
                             }}
                             className="p-2 hover:bg-accent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                             title="New Chat in Project"
@@ -185,7 +224,7 @@ export function ProjectSidebar({
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              onNewProjectChat(project.id) // This will handle setting the active project
+                              onNewProjectChat(project.id)
                               setContextMenuId(null)
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent transition-colors"
@@ -238,8 +277,3 @@ export function ProjectSidebar({
     </>
   )
 }
-
-
-
-
-
