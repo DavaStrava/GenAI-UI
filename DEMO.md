@@ -39,7 +39,7 @@ This guide walks you through demonstrating the MVP features of GenAI Chat UI.
 5. Wait for response
 6. **While response is streaming**, click **LLM Selector** again
 7. Switch to another provider:
-   - **Anthropic** → **claude-3-5-sonnet-20241022** (recommended - most reliable)
+   - **Anthropic** → **claude-3-7-sonnet-20250219** or **claude-sonnet-4-20250514** (recommended - most reliable)
    - **Google** → **gemini-2.0-flash** (if available, more reliable than 2.5-flash)
    - **Note**: `gemini-2.5-flash` has known issues with empty responses. `gemini-2.5-pro` has very low free tier limits.
 8. Ask: "Continue from where the previous response left off"

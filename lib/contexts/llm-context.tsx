@@ -1,123 +1,187 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
-import { getAllProviders, getProvider } from "@/lib/llm/provider-factory"
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
+import { getSettings, saveSettings } from "@/lib/storage/settings"
+import { getAllProviders } from "@/lib/llm/provider-factory"
 
 interface LLMContextType {
   provider: string
-  model: string // Display name
+  model: string
   temperature: number
-  maxTokens: number | undefined
-  isLoading: boolean
+  maxTokens: number
   setProvider: (provider: string) => void
   setModel: (model: string) => void
   setTemperature: (temperature: number) => void
-  setMaxTokens: (maxTokens: number | undefined) => void
-  availableProviders: ReturnType<typeof getAllProviders>
+  setMaxTokens: (maxTokens: number) => void
   getCurrentApiKey: () => Promise<string | undefined>
-  getModelId: () => string | undefined // Get API model ID from display name
-  refreshSettings: () => Promise<void>
 }
 
 const LLMContext = createContext<LLMContextType | undefined>(undefined)
 
+const DEFAULT_PROVIDER = "openai"
+const DEFAULT_MODEL = "gpt-4o-mini"
+const DEFAULT_TEMPERATURE = 0.7
+const DEFAULT_MAX_TOKENS = 2000
+
 export function LLMProvider({ children }: { children: React.ReactNode }) {
-  const providers = getAllProviders()
+  const [provider, setProviderState] = useState<string>(DEFAULT_PROVIDER)
+  const [model, setModelState] = useState<string>(DEFAULT_MODEL)
+  const [temperature, setTemperatureState] = useState<number>(DEFAULT_TEMPERATURE)
+  const [maxTokens, setMaxTokensState] = useState<number>(DEFAULT_MAX_TOKENS)
+  const isValidatingRef = useRef(false)
 
-  const [provider, setProviderState] = useState("openai")
-  const [model, setModelState] = useState(providers[0]?.models[0]?.name || "")
-  const [temperature, setTemperatureState] = useState(0.7)
-  const [maxTokens, setMaxTokensState] = useState<number | undefined>(undefined)
-  const [isLoading, setIsLoading] = useState(true)
-
-  const refreshSettings = useCallback(async () => {
-    try {
-      const response = await fetch("/api/settings/db")
-      if (response.ok) {
-        const settings = await response.json()
-        if (settings.defaultProvider) {
-          setProviderState(settings.defaultProvider)
-        }
-        if (settings.defaultModel) {
-          // Convert stored model (could be ID or name) to display name
-          const providerObj = getProvider(settings.defaultProvider || "openai")
-          if (providerObj) {
-            const modelObj = providerObj.models.find(
-              (m) => m.id === settings.defaultModel || m.name === settings.defaultModel
-            )
-            setModelState(modelObj?.name || settings.defaultModel)
-          } else {
-            setModelState(settings.defaultModel)
-          }
-        }
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const settings = getSettings()
+    const providers = getAllProviders()
+    
+    // Validate and set provider
+    let providerToUse = DEFAULT_PROVIDER
+    if (settings.defaultProvider) {
+      const providerExists = providers.some((p) => p.id === settings.defaultProvider)
+      if (providerExists) {
+        providerToUse = settings.defaultProvider
+        setProviderState(providerToUse)
+      } else {
+        setProviderState(DEFAULT_PROVIDER)
       }
-    } catch (error) {
-      console.error("Error fetching settings:", error)
+    } else {
+      setProviderState(DEFAULT_PROVIDER)
+    }
+    
+    // Validate and set model - ensure it exists for the selected provider
+    const selectedProvider = providers.find((p) => p.id === providerToUse)
+    if (selectedProvider) {
+      let modelToUse = DEFAULT_MODEL
+      if (settings.defaultModel) {
+        // Check if the stored model exists in the provider's model list
+        const modelExists = selectedProvider.models.some((m) => m.id === settings.defaultModel)
+        if (modelExists) {
+          modelToUse = settings.defaultModel
+        } else {
+          // Model doesn't exist, use first available model for this provider
+          modelToUse = selectedProvider.models[0]?.id || DEFAULT_MODEL
+          // Update stored settings with the valid model
+          saveSettings({
+            ...settings,
+            defaultProvider: providerToUse,
+            defaultModel: modelToUse,
+          })
+        }
+      } else {
+        // No model stored, use first available model for this provider
+        modelToUse = selectedProvider.models[0]?.id || DEFAULT_MODEL
+      }
+      setModelState(modelToUse)
+    } else {
+      setModelState(DEFAULT_MODEL)
+    }
+    
+    // Load temperature and maxTokens from localStorage if available
+    if (typeof window !== "undefined") {
+      const storedTemp = localStorage.getItem("genai_temperature")
+      const storedMaxTokens = localStorage.getItem("genai_max_tokens")
+      if (storedTemp) {
+        setTemperatureState(parseFloat(storedTemp))
+      }
+      if (storedMaxTokens) {
+        setMaxTokensState(parseInt(storedMaxTokens, 10))
+      }
     }
   }, [])
 
+  const setModel = useCallback((newModel: string) => {
+    setModelState(newModel)
+    const settings = getSettings()
+    saveSettings({
+      ...settings,
+      defaultModel: newModel,
+    })
+  }, [])
+
+  const setProvider = useCallback((newProvider: string) => {
+    setProviderState(newProvider)
+    const settings = getSettings()
+    saveSettings({
+      ...settings,
+      defaultProvider: newProvider,
+    })
+    
+    // Reset model to first available model for the new provider
+    const providers = getAllProviders()
+    const selectedProvider = providers.find((p) => p.id === newProvider)
+    if (selectedProvider && selectedProvider.models.length > 0) {
+      setModel(selectedProvider.models[0].id)
+    }
+  }, [setModel])
+
+  const setTemperature = useCallback((newTemperature: number) => {
+    setTemperatureState(newTemperature)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("genai_temperature", newTemperature.toString())
+    }
+  }, [])
+
+  const setMaxTokens = useCallback((newMaxTokens: number) => {
+    setMaxTokensState(newMaxTokens)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("genai_max_tokens", newMaxTokens.toString())
+    }
+  }, [])
+
+  // Validate model whenever provider changes (to ensure model is valid for new provider)
   useEffect(() => {
-    const loadSettings = async () => {
-      setIsLoading(true)
-      await refreshSettings()
-      setIsLoading(false)
-    }
-
-    loadSettings()
-  }, [refreshSettings])
-
-  const setProvider = (newProvider: string) => {
-    const providerObj = getProvider(newProvider)
-    if (providerObj) {
-      setProviderState(newProvider)
-      // Check if current model exists in new provider
-      const currentModelExists = providerObj.models.some(
-        (m) => m.name === model || m.id === model
-      )
-      if (!currentModelExists) {
-        setModelState(providerObj.models[0]?.name || "")
+    if (isValidatingRef.current) return
+    isValidatingRef.current = true
+    
+    const providers = getAllProviders()
+    const selectedProvider = providers.find((p) => p.id === provider)
+    
+    if (selectedProvider) {
+      // Check if current model exists for this provider
+      const modelExists = selectedProvider.models.some((m) => m.id === model)
+      if (!modelExists) {
+        // Model doesn't exist, reset to first available model
+        const firstModel = selectedProvider.models[0]?.id
+        if (firstModel && firstModel !== model) {
+          console.warn(`Model "${model}" not found for provider "${provider}", resetting to "${firstModel}"`)
+          setModelState(firstModel)
+          const settings = getSettings()
+          saveSettings({
+            ...settings,
+            defaultProvider: provider,
+            defaultModel: firstModel,
+          })
+        }
       }
     }
-  }
-
-  const setModel = (newModel: string) => {
-    const providerObj = getProvider(provider)
-    if (providerObj) {
-      // Check if the model name or ID exists
-      const modelExists = providerObj.models.some(
-        (m) => m.name === newModel || m.id === newModel
-      )
-      if (modelExists) {
-        // Store the display name
-        const modelObj = providerObj.models.find(
-          (m) => m.name === newModel || m.id === newModel
-        )
-        setModelState(modelObj?.name || newModel)
-      }
-    }
-  }
+    
+    isValidatingRef.current = false
+  }, [provider]) // Only run when provider changes, not model
 
   const getCurrentApiKey = useCallback(async (): Promise<string | undefined> => {
     try {
       const response = await fetch(`/api/settings/apikey?provider=${provider}`)
       if (response.ok) {
         const data = await response.json()
-        return data.apiKey
+        if (data.apiKey) {
+          return data.apiKey
+        }
+        console.warn(`API key for ${provider} is empty`)
+        return undefined
+      } else if (response.status === 404) {
+        console.warn(`No API key configured for ${provider}. Please configure it in Settings.`)
+        return undefined
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        console.error(`Failed to fetch API key for ${provider}:`, response.status, errorData)
+        return undefined
       }
-      return undefined
     } catch (error) {
       console.error("Error fetching API key:", error)
       return undefined
     }
   }, [provider])
-
-  const getModelId = useCallback((): string | undefined => {
-    const providerObj = getProvider(provider)
-    if (providerObj && model) {
-      return providerObj.getModelId(model)
-    }
-    return undefined
-  }, [provider, model])
 
   return (
     <LLMContext.Provider
@@ -126,15 +190,11 @@ export function LLMProvider({ children }: { children: React.ReactNode }) {
         model,
         temperature,
         maxTokens,
-        isLoading,
         setProvider,
         setModel,
-        setTemperature: setTemperatureState,
-        setMaxTokens: setMaxTokensState,
-        availableProviders: providers,
+        setTemperature,
+        setMaxTokens,
         getCurrentApiKey,
-        getModelId,
-        refreshSettings,
       }}
     >
       {children}

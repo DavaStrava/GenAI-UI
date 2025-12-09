@@ -6,8 +6,10 @@ import { type Message } from "@/components/chat/chat-message"
 import { ChatInput } from "@/components/chat/chat-input"
 import { ChatHeader } from "@/components/chat/chat-header"
 import { ProjectSidebar, type SidebarChat } from "@/components/projects/project-sidebar"
+import { RichTextEditor } from "@/components/editor/rich-text-editor"
 import { useLLM } from "@/lib/contexts/llm-context"
 import { useProject } from "@/lib/contexts/project-context"
+import { cn } from "@/lib/utils"
 
 // Helper to generate chat name from first message
 function generateChatName(firstMessage: string): string {
@@ -26,6 +28,9 @@ export default function Home() {
   const [currentChatProjectId, setCurrentChatProjectId] = useState<string | null>(null)
   const [pendingProjectId, setPendingProjectId] = useState<string | null>(null)
   const [chatListRefresh, setChatListRefresh] = useState(0)
+  const [showEditor, setShowEditor] = useState(false)
+  const [documentContent, setDocumentContent] = useState("")
+  const [selectedText, setSelectedText] = useState<string | null>(null)
   const { provider, model, temperature, maxTokens, getCurrentApiKey } = useLLM()
   const { activeProject, projects, setActiveProject } = useProject()
   const savingRef = useRef(false)
@@ -291,6 +296,18 @@ export default function Home() {
     setCurrentChatProjectId(null)
   }, [])
 
+  const handleTextSelect = useCallback((text: string) => {
+    setSelectedText(text)
+  }, [])
+
+  const handleRefineSelectedText = useCallback(() => {
+    if (!selectedText) return
+    
+    const prompt = `Please refine and improve the following text:\n\n"${selectedText}"\n\nProvide an improved version with explanations of the changes.`
+    handleSendMessage(prompt)
+    setSelectedText(null)
+  }, [selectedText, handleSendMessage])
+
   // Update chat name when first message is sent
   useEffect(() => {
     if (
@@ -309,7 +326,14 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen">
-      <ChatHeader onClear={handleClear} messageCount={messages.length} />
+      <ChatHeader 
+        onClear={handleClear} 
+        messageCount={messages.length}
+        showEditor={showEditor}
+        onToggleEditor={() => setShowEditor(!showEditor)}
+        selectedText={selectedText}
+        onRefineText={handleRefineSelectedText}
+      />
       <div className="flex flex-1 overflow-hidden">
         <ProjectSidebar
           onNewProjectChat={handleNewProjectChat}
@@ -318,9 +342,28 @@ export default function Home() {
           onCreateNewChat={handleNewChat}
           chatListRefresh={chatListRefresh}
         />
-        <div className="flex flex-col flex-1 min-w-0">
-          <ChatContainer messages={messages} isLoading={isLoading} />
-          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+        <div className="flex flex-1 overflow-hidden">
+          {/* Document Editor - Left Side */}
+          {showEditor && (
+            <div className="w-1/2 border-r flex flex-col">
+              <RichTextEditor
+                content={documentContent}
+                onChange={setDocumentContent}
+                placeholder="Start writing your document..."
+                onTextSelect={handleTextSelect}
+                className="flex-1"
+              />
+            </div>
+          )}
+          
+          {/* Chat Panel - Right Side */}
+          <div className={cn(
+            "flex flex-col flex-1 min-w-0",
+            showEditor && "w-1/2"
+          )}>
+            <ChatContainer messages={messages} isLoading={isLoading} />
+            <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+          </div>
         </div>
       </div>
     </div>

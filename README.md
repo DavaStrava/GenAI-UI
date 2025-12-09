@@ -182,21 +182,15 @@ GOOGLE_API_KEY=your_key_here
 - `gpt-3.5-turbo` - Fast and affordable
 
 #### Anthropic Claude
-- `claude-opus-4-5-20251101` - Claude Opus 4.5 (latest, most capable)
-- `claude-sonnet-4-5-20250929` - Claude Sonnet 4.5 (latest, recommended)
-- `claude-haiku-4-5-20251001` - Claude Haiku 4.5 (latest, fast and efficient)
-- `claude-opus-4-1-20250805` - Claude Opus 4.1
-- `claude-opus-4-20250514` - Claude Opus 4
+- `claude-3-7-sonnet-20250219` - Latest Claude 3.7 Sonnet
 - `claude-sonnet-4-20250514` - Claude Sonnet 4
-- `claude-3-5-haiku-20241022` - Claude 3.5 Haiku
-- `claude-3-haiku-20240307` - Claude 3 Haiku
+- `claude-opus-4-20250514` - Claude Opus 4 (most capable)
+- `claude-opus-4-1-20250805` - Claude Opus 4.1
 
 #### Google Gemini
-- `gemini-2.5-pro` - Most capable (stable release) ⚠️ Very low free tier limits
-- `gemini-2.5-flash` - Fast and efficient (supports up to 1M tokens) ✅ Recommended for free tier
+- `gemini-2.5-pro` - Most capable (stable release)
+- `gemini-2.5-flash` - Fast and efficient (supports up to 1M tokens)
 - `gemini-2.0-flash` - Fast and versatile multimodal model
-
-**Note**: For free tier usage, `gemini-2.5-flash` is recommended as it has much higher quota limits than `gemini-2.5-pro`.
 
 ## 🔒 Security Notes
 
@@ -218,26 +212,22 @@ GOOGLE_API_KEY=your_key_here
 
 ## 🐛 Troubleshooting
 
-For detailed troubleshooting information, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
+### API Key Errors
 
-### Quick Fixes
-
-**API Key Errors:**
 - **"API key is required"**: Go to Settings and configure your API keys
 - **"API key validation failed"**: Check that your key is correct and has the right permissions
 - **Rate Limit Errors**: You've exceeded your API quota - wait or upgrade your plan
 
-**Storage Issues:**
+### Storage Issues
+
 - **Chats not saving**: Check browser localStorage quota (usually 5-10MB)
 - **Data lost**: All data is stored locally - clearing browser data will delete it
 
-**Build Errors:**
+### Build Errors
+
 - Run `npm install` to ensure all dependencies are installed
 - Check Node.js version (requires 18+)
 - Clear `.next` folder and rebuild: `rm -rf .next && npm run build`
-
-**Dropdown/UI Issues:**
-- If dropdown menus are not clickable, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md#dropdown-menu-click-issues) for the solution
 
 ## 🚧 Known Limitations (MVP)
 

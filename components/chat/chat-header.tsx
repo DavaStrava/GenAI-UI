@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Trash2, Sparkles, Settings, ChevronDown, ChevronUp } from "lucide-react"
+import { Trash2, Sparkles, Settings, ChevronDown, ChevronUp, FileText, Wand2 } from "lucide-react"
 import Link from "next/link"
 import { LLMSelector } from "@/components/llm/llm-selector"
 import { ModelParameters } from "@/components/settings/model-parameters"
@@ -11,9 +11,20 @@ import { useLLM } from "@/lib/contexts/llm-context"
 interface ChatHeaderProps {
   onClear: () => void
   messageCount: number
+  showEditor?: boolean
+  onToggleEditor?: () => void
+  selectedText?: string | null
+  onRefineText?: () => void
 }
 
-export function ChatHeader({ onClear, messageCount }: ChatHeaderProps) {
+export function ChatHeader({ 
+  onClear, 
+  messageCount, 
+  showEditor = false, 
+  onToggleEditor,
+  selectedText,
+  onRefineText 
+}: ChatHeaderProps) {
   const [showParameters, setShowParameters] = useState(false)
   const { temperature, maxTokens, setTemperature, setMaxTokens } = useLLM()
 
@@ -32,6 +43,28 @@ export function ChatHeader({ onClear, messageCount }: ChatHeaderProps) {
           </div>
           <div className="flex items-center gap-2">
             <LLMSelector />
+            {onToggleEditor && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleEditor}
+                className={showEditor ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Editor
+              </Button>
+            )}
+            {selectedText && onRefineText && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onRefineText}
+                className="gap-2"
+              >
+                <Wand2 className="h-4 w-4" />
+                Refine Selected Text
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

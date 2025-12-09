@@ -1,68 +1,10 @@
-/**
- * Base interface for all LLM providers
- */
-export interface LLMMessage {
-  role: "user" | "assistant" | "system"
-  content: string
-}
-
-export interface LLMModel {
-  /**
-   * API identifier for the model (used in API requests)
-   */
+export interface Model {
   id: string
-  /**
-   * User-friendly display name
-   */
   name: string
 }
 
-export interface LLMStreamOptions {
-  model: string
-  messages: LLMMessage[]
-  temperature?: number
-  maxTokens?: number
+export abstract class LLMProvider {
+  abstract id: string
+  abstract name: string
+  abstract models: Model[]
 }
-
-export interface LLMProvider {
-  /**
-   * Unique identifier for the provider
-   */
-  readonly id: string
-
-  /**
-   * Display name for the provider
-   */
-  readonly name: string
-
-  /**
-   * List of available models for this provider
-   * Each model has an API identifier and a display name
-   */
-  readonly models: LLMModel[]
-
-  /**
-   * Get the API identifier for a model by its display name or ID
-   * @param modelNameOrId - Display name or API identifier
-   * @returns API identifier for the model
-   */
-  getModelId(modelNameOrId: string): string | undefined
-
-  /**
-   * Stream a chat completion response
-   * @param options - Stream options including model, messages, and parameters
-   * @param apiKey - API key for the provider
-   * @returns Async generator that yields content chunks
-   */
-  stream(
-    options: LLMStreamOptions,
-    apiKey: string
-  ): AsyncGenerator<string, void, unknown>
-}
-
-
-
-
-
-
-
