@@ -1,4 +1,4 @@
-import { LLMProvider, type LLMStreamOptions } from "./base"
+import { LLMProvider, type LLMStreamOptions, type LLMModel } from "./base"
 
 /**
  * OpenAI provider implementation
@@ -6,13 +6,21 @@ import { LLMProvider, type LLMStreamOptions } from "./base"
 export class OpenAIProvider implements LLMProvider {
   readonly id = "openai"
   readonly name = "OpenAI"
-  readonly models = [
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4-turbo",
-    "gpt-4",
-    "gpt-3.5-turbo",
+  readonly models: LLMModel[] = [
+    { id: "gpt-5", name: "GPT-5" },
+    { id: "gpt-4o", name: "GPT-4o" },
+    { id: "gpt-4o-mini", name: "GPT-4o Mini" },
+    { id: "gpt-4-turbo", name: "GPT-4 Turbo" },
+    { id: "gpt-4", name: "GPT-4" },
+    { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
   ]
+
+  getModelId(modelNameOrId: string): string | undefined {
+    const model = this.models.find(
+      (m) => m.id === modelNameOrId || m.name === modelNameOrId
+    )
+    return model?.id
+  }
 
   async *stream(
     options: LLMStreamOptions,
@@ -73,6 +81,7 @@ export class OpenAIProvider implements LLMProvider {
     }
   }
 }
+
 
 
 

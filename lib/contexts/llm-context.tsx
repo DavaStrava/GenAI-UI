@@ -5,7 +5,7 @@ import { getAllProviders, getProvider } from "@/lib/llm/provider-factory"
 
 interface LLMContextType {
   provider: string
-  model: string
+  model: string // Display name
   temperature: number
   maxTokens: number | undefined
   isLoading: boolean
@@ -15,6 +15,7 @@ interface LLMContextType {
   setMaxTokens: (maxTokens: number | undefined) => void
   availableProviders: ReturnType<typeof getAllProviders>
   getCurrentApiKey: () => Promise<string | undefined>
+  getModelId: () => string | undefined // Get API model ID from display name
   refreshSettings: () => Promise<void>
 }
 
@@ -24,7 +25,7 @@ export function LLMProvider({ children }: { children: React.ReactNode }) {
   const providers = getAllProviders()
 
   const [provider, setProviderState] = useState("openai")
-  const [model, setModelState] = useState(providers[0]?.models[0] || "")
+  const [model, setModelState] = useState(providers[0]?.models[0]?.name || "")
   const [temperature, setTemperatureState] = useState(0.7)
   const [maxTokens, setMaxTokensState] = useState<number | undefined>(undefined)
   const [isLoading, setIsLoading] = useState(true)
@@ -38,7 +39,16 @@ export function LLMProvider({ children }: { children: React.ReactNode }) {
           setProviderState(settings.defaultProvider)
         }
         if (settings.defaultModel) {
-          setModelState(settings.defaultModel)
+          // Convert stored model (could be ID or name) to display name
+          const providerObj = getProvider(settings.defaultProvider || "openai")
+          if (providerObj) {
+            const modelObj = providerObj.models.find(
+              (m) => m.id === settings.defaultModel || m.name === settings.defaultModel
+            )
+            setModelState(modelObj?.name || settings.defaultModel)
+          } else {
+            setModelState(settings.defaultModel)
+          }
         }
       }
     } catch (error) {
@@ -60,16 +70,30 @@ export function LLMProvider({ children }: { children: React.ReactNode }) {
     const providerObj = getProvider(newProvider)
     if (providerObj) {
       setProviderState(newProvider)
-      if (!providerObj.models.includes(model)) {
-        setModelState(providerObj.models[0])
+      // Check if current model exists in new provider
+      const currentModelExists = providerObj.models.some(
+        (m) => m.name === model || m.id === model
+      )
+      if (!currentModelExists) {
+        setModelState(providerObj.models[0]?.name || "")
       }
     }
   }
 
   const setModel = (newModel: string) => {
     const providerObj = getProvider(provider)
-    if (providerObj?.models.includes(newModel)) {
-      setModelState(newModel)
+    if (providerObj) {
+      // Check if the model name or ID exists
+      const modelExists = providerObj.models.some(
+        (m) => m.name === newModel || m.id === newModel
+      )
+      if (modelExists) {
+        // Store the display name
+        const modelObj = providerObj.models.find(
+          (m) => m.name === newModel || m.id === newModel
+        )
+        setModelState(modelObj?.name || newModel)
+      }
     }
   }
 
@@ -87,6 +111,14 @@ export function LLMProvider({ children }: { children: React.ReactNode }) {
     }
   }, [provider])
 
+  const getModelId = useCallback((): string | undefined => {
+    const providerObj = getProvider(provider)
+    if (providerObj && model) {
+      return providerObj.getModelId(model)
+    }
+    return undefined
+  }, [provider, model])
+
   return (
     <LLMContext.Provider
       value={{
@@ -101,6 +133,7 @@ export function LLMProvider({ children }: { children: React.ReactNode }) {
         setMaxTokens: setMaxTokensState,
         availableProviders: providers,
         getCurrentApiKey,
+        getModelId,
         refreshSettings,
       }}
     >

@@ -6,6 +6,17 @@ export interface LLMMessage {
   content: string
 }
 
+export interface LLMModel {
+  /**
+   * API identifier for the model (used in API requests)
+   */
+  id: string
+  /**
+   * User-friendly display name
+   */
+  name: string
+}
+
 export interface LLMStreamOptions {
   model: string
   messages: LLMMessage[]
@@ -26,8 +37,16 @@ export interface LLMProvider {
 
   /**
    * List of available models for this provider
+   * Each model has an API identifier and a display name
    */
-  readonly models: string[]
+  readonly models: LLMModel[]
+
+  /**
+   * Get the API identifier for a model by its display name or ID
+   * @param modelNameOrId - Display name or API identifier
+   * @returns API identifier for the model
+   */
+  getModelId(modelNameOrId: string): string | undefined
 
   /**
    * Stream a chat completion response
@@ -40,6 +59,7 @@ export interface LLMProvider {
     apiKey: string
   ): AsyncGenerator<string, void, unknown>
 }
+
 
 
 

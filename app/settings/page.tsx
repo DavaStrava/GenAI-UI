@@ -36,7 +36,7 @@ export default function SettingsPage() {
   const [saveStatus, setSaveStatus] = useState<"success" | "error" | null>(null)
   const [validating, setValidating] = useState<Record<string, boolean>>({})
   const [validationStatus, setValidationStatus] = useState<
-    Record<string, { valid: boolean; message?: string }>
+    Record<string, { valid: boolean; message?: string; availableModels?: string[] }>
   >({})
 
   const providers = getAllProviders()
@@ -84,7 +84,7 @@ export default function SettingsPage() {
     const newSettings: Settings = {
       ...settings,
       defaultProvider: providerId,
-      defaultModel: provider?.models[0] || settings.defaultModel,
+      defaultModel: provider?.models[0]?.name || settings.defaultModel,
     }
     setSettings(newSettings)
   }
@@ -98,7 +98,30 @@ export default function SettingsPage() {
   }
 
   const validateApiKey = async (providerId: string, apiKey: string) => {
-    if (!apiKey) return
+    // If no key in input but key is configured, fetch it from backend for validation
+    let keyToValidate = apiKey
+    if (!keyToValidate && hasApiKey[providerId as keyof HasApiKey]) {
+      try {
+        const response = await fetch(`/api/settings/apikey?provider=${providerId}`)
+        if (response.ok) {
+          const data = await response.json()
+          keyToValidate = data.apiKey
+        }
+      } catch (error) {
+        console.error("Error fetching API key for validation:", error)
+      }
+    }
+
+    if (!keyToValidate) {
+      setValidationStatus((prev) => ({
+        ...prev,
+        [providerId]: {
+          valid: false,
+          message: "Please enter an API key to validate",
+        },
+      }))
+      return
+    }
 
     setValidating((prev) => ({ ...prev, [providerId]: true }))
     setValidationStatus((prev) => ({
@@ -113,11 +136,11 @@ export default function SettingsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          provider: providerId,
-          apiKey,
-          model: provider?.models[0],
-        }),
+      body: JSON.stringify({
+        provider: providerId,
+        apiKey: keyToValidate,
+        model: provider?.models[0]?.name || provider?.models[0]?.id,
+      }),
       })
 
       const result = await response.json()
@@ -126,6 +149,7 @@ export default function SettingsPage() {
         [providerId]: {
           valid: result.valid,
           message: result.message || result.error,
+          availableModels: result.availableModels, // Store available models if provided
         },
       }))
     } catch (error) {
@@ -285,7 +309,8 @@ export default function SettingsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => validateApiKey(provider.id, apiKey)}
-                        disabled={!apiKey || isValidating}
+                        disabled={(!apiKey && !keyConfigured) || isValidating}
+                        title={!apiKey && !keyConfigured ? "Enter an API key to validate" : "Validate API key"}
                       >
                         {isValidating ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -300,23 +325,30 @@ export default function SettingsPage() {
                       </p>
                     )}
                     {validation && (
-                      <div
-                        className={`text-xs flex items-center gap-1 ${
-                          validation.valid
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {validation.valid ? (
-                          <Check className="h-3 w-3" />
-                        ) : (
-                          <X className="h-3 w-3" />
+                      <div className="space-y-1">
+                        <div
+                          className={`text-xs flex items-center gap-1 ${
+                            validation.valid
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {validation.valid ? (
+                            <Check className="h-3 w-3" />
+                          ) : (
+                            <X className="h-3 w-3" />
+                          )}
+                          <span>{validation.message}</span>
+                        </div>
+                        {validation.availableModels && (
+                          <div className="text-xs text-muted-foreground pl-4">
+                            Available models from API: {validation.availableModels.join(", ")}
+                          </div>
                         )}
-                        <span>{validation.message}</span>
                       </div>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Available models: {provider.models.join(", ")}
+                      Models in app: {provider.models.map(m => m.name).join(", ")}
                     </p>
                   </div>
                 )
@@ -355,13 +387,13 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Default Model</label>
                   <select
-                    value={settings.defaultModel || defaultProvider.models[0]}
+                    value={settings.defaultModel || defaultProvider.models[0]?.name || ""}
                     onChange={(e) => handleDefaultModelChange(e.target.value)}
                     className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     {defaultProvider.models.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
+                      <option key={model.id} value={model.name}>
+                        {model.name}
                       </option>
                     ))}
                   </select>

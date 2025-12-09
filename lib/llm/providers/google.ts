@@ -1,4 +1,4 @@
-import { LLMProvider, type LLMStreamOptions } from "./base"
+import { LLMProvider, type LLMStreamOptions, type LLMModel } from "./base"
 
 /**
  * Google Gemini provider implementation
@@ -6,11 +6,22 @@ import { LLMProvider, type LLMStreamOptions } from "./base"
 export class GoogleProvider implements LLMProvider {
   readonly id = "google"
   readonly name = "Google (Gemini)"
-  readonly models = [
-    "gemini-2.5-pro",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
+  readonly models: LLMModel[] = [
+    { id: "gemini-3.0-pro", name: "Gemini 3.0 Pro" },
+    { id: "gemini-3.0-flash", name: "Gemini 3.0 Flash" },
+    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
+    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
+    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash" },
   ]
+
+  getModelId(modelNameOrId: string): string | undefined {
+    const model = this.models.find(
+      (m) => m.id === modelNameOrId || m.name === modelNameOrId
+    )
+    return model?.id
+  }
 
   async *stream(
     options: LLMStreamOptions,

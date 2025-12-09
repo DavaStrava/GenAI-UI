@@ -71,13 +71,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Use provided model or default to first available model for provider
-    const selectedModel = model || llmProvider.models[0]
+    // Convert model display name to API ID, or use provided model (could be ID or name)
+    const modelNameOrId = model || llmProvider.models[0]?.name || llmProvider.models[0]?.id
+    const selectedModelId = llmProvider.getModelId(modelNameOrId || "")
 
-    if (!llmProvider.models.includes(selectedModel)) {
+    if (!selectedModelId) {
       return new Response(
         JSON.stringify({
-          error: `Model ${selectedModel} is not available for provider ${provider}`,
+          error: `Model ${modelNameOrId} is not available for provider ${provider}`,
         }),
         {
           status: 400,
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           const streamOptions = {
-            model: selectedModel,
+            model: selectedModelId,
             messages: messages as LLMMessage[],
             temperature: temperature !== undefined ? temperature : 0.7,
             maxTokens: maxTokens,

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server"
-import { getProvider } from "@/lib/llm/provider-factory"
+import { getProvider, getAllProviders } from "@/lib/llm/provider-factory"
 
 export const runtime = "edge"
 
@@ -10,14 +10,16 @@ export async function GET(req: NextRequest) {
   try {
     // Return settings structure without sensitive data
     // Client-side code will handle retrieving from localStorage
+    const providers = getAllProviders().map((p) => ({
+      id: p.id,
+      name: p.name,
+      models: p.models,
+    }))
+    
     return new Response(
       JSON.stringify({
         message: "Settings are stored client-side in localStorage",
-        providers: [
-          { id: "openai", name: "OpenAI", models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"] },
-          { id: "anthropic", name: "Anthropic (Claude)", models: ["claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"] },
-          { id: "google", name: "Google (Gemini)", models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"] },
-        ],
+        providers,
       }),
       {
         status: 200,
@@ -62,7 +64,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const selectedModel = model || llmProvider.models[0]
+    // Convert model display name to API ID
+    const modelNameOrId = model || llmProvider.models[0]?.name || llmProvider.models[0]?.id
+    const selectedModelId = llmProvider.getModelId(modelNameOrId || "")
+
+    if (!selectedModelId) {
+      return new Response(
+        JSON.stringify({
+          valid: false,
+          error: `Model ${modelNameOrId} is not available for provider ${provider}`,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+    }
 
     // Test the API key by making a minimal request
     try {
@@ -75,6 +92,35 @@ export async function POST(req: NextRequest) {
           },
         })
       } else if (provider === "anthropic") {
+        // First try to fetch available models to validate
+        const modelsResponse = await fetch("https://api.anthropic.com/v1/models", {
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+        })
+        
+        if (modelsResponse.ok) {
+          const modelsData = await modelsResponse.json()
+          const availableModels = modelsData.data?.map((m: any) => m.id) || []
+          
+          // Check if the selected model is available
+          if (!availableModels.includes(selectedModelId)) {
+            return new Response(
+              JSON.stringify({
+                valid: false,
+                error: `Model "${selectedModelId}" is not available. Available models: ${availableModels.join(", ")}`,
+                availableModels,
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              }
+            )
+          }
+        }
+        
+        // Then test with a minimal request
         testResponse = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -83,14 +129,14 @@ export async function POST(req: NextRequest) {
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: selectedModel,
+            model: selectedModelId,
             messages: [{ role: "user", content: "test" }],
             max_tokens: 1,
           }),
         })
       } else if (provider === "google") {
         const url = new URL(
-          `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelId}:generateContent`,
         )
         url.searchParams.set("key", apiKey)
         testResponse = await fetch(url.toString(), {

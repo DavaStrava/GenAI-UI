@@ -182,11 +182,14 @@ GOOGLE_API_KEY=your_key_here
 - `gpt-3.5-turbo` - Fast and affordable
 
 #### Anthropic Claude
-- `claude-3-5-sonnet-20241022` - Latest Claude 3.5
-- `claude-3-5-sonnet-20240620` - Claude 3.5 Sonnet
-- `claude-3-opus-20240229` - Most capable
-- `claude-3-sonnet-20240229` - Balanced performance
-- `claude-3-haiku-20240307` - Fast and efficient
+- `claude-opus-4-5-20251101` - Claude Opus 4.5 (latest, most capable)
+- `claude-sonnet-4-5-20250929` - Claude Sonnet 4.5 (latest, recommended)
+- `claude-haiku-4-5-20251001` - Claude Haiku 4.5 (latest, fast and efficient)
+- `claude-opus-4-1-20250805` - Claude Opus 4.1
+- `claude-opus-4-20250514` - Claude Opus 4
+- `claude-sonnet-4-20250514` - Claude Sonnet 4
+- `claude-3-5-haiku-20241022` - Claude 3.5 Haiku
+- `claude-3-haiku-20240307` - Claude 3 Haiku
 
 #### Google Gemini
 - `gemini-2.5-pro` - Most capable (stable release) ⚠️ Very low free tier limits

@@ -157,17 +157,17 @@ export function LLMSelector() {
                 Model
               </div>
               {currentProvider.models.map((m) => {
-                const isSelected = m === model
+                const isSelected = m.name === model || m.id === model
                 return (
                   <button
-                    key={m}
+                    key={m.id}
                     type="button"
-                    onClick={() => handleModelChange(m)}
+                    onClick={() => handleModelChange(m.name)}
                     className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors cursor-pointer ${
                       isSelected ? "bg-accent" : ""
                     }`}
                   >
-                    <span className="text-xs font-mono">{m}</span>
+                    <span className="text-sm">{m.name}</span>
                     {isSelected && <Check className="h-4 w-4" />}
                   </button>
                 )
