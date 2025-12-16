@@ -99,9 +99,10 @@ export async function POST(req: NextRequest) {
             // Log request details for debugging (without exposing full API key)
             console.log(`Anthropic API Request: model=${model}, apiKeyPrefix=${trimmedApiKey.substring(0, 10)}..., body=${JSON.stringify(body)}`)
           } else if (provider === "google") {
-            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}`
+            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`
             headers = {
               "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
             }
             // Convert messages to Google's format
             const contents = messages.map((msg: any) => ({
@@ -233,7 +234,7 @@ export async function POST(req: NextRequest) {
               }
             }
           } else if (provider === "google") {
-            // Google streaming format
+            // Google streaming format (SSE)
             while (true) {
               const { done, value } = await reader.read()
               if (done) break
@@ -242,16 +243,39 @@ export async function POST(req: NextRequest) {
               const lines = chunk.split("\n").filter((line) => line.trim() !== "")
 
               for (const line of lines) {
-                try {
-                  const parsed = JSON.parse(line)
-                  if (parsed.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    const content = parsed.candidates[0].content.parts[0].text
-                    controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
-                    )
+                // Handle SSE format: lines start with "data: "
+                if (line.startsWith("data: ")) {
+                  const data = line.slice(6) // Remove "data: " prefix
+                  if (data === "[DONE]") {
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+                    controller.close()
+                    return
                   }
-                } catch (e) {
-                  // Continue processing other lines
+                  
+                  try {
+                    const parsed = JSON.parse(data)
+                    if (parsed.candidates?.[0]?.content?.parts?.[0]?.text) {
+                      const content = parsed.candidates[0].content.parts[0].text
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
+                      )
+                    }
+                  } catch (e) {
+                    // Continue processing other lines
+                  }
+                } else {
+                  // Fallback: try parsing as direct JSON (for non-SSE format)
+                  try {
+                    const parsed = JSON.parse(line)
+                    if (parsed.candidates?.[0]?.content?.parts?.[0]?.text) {
+                      const content = parsed.candidates[0].content.parts[0].text
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ content })}\n\n`)
+                      )
+                    }
+                  } catch (e) {
+                    // Continue processing other lines
+                  }
                 }
               }
             }
